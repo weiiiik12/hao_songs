@@ -15,10 +15,37 @@
             display: flex; justify-content: center; align-items: center;
         }
         
+        /* 🔒 登入畫面的樣式 */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #f0f9ff 0%, #cbebff 100%);
+            display: flex; justify-content: center; align-items: center; z-index: 9999;
+        }
+        .login-card {
+            background: white; padding: 40px 30px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 50, 100, 0.1); text-align: center;
+            width: 90%; max-width: 400px;
+        }
+        .login-card h2 { color: #1e293b; margin-top: 0; margin-bottom: 20px; }
+        .login-card input {
+            width: 100%; padding: 15px; margin-bottom: 15px;
+            border: 2px solid #e2e8f0; border-radius: 12px; font-size: 20px;
+            text-align: center; outline: none; transition: border-color 0.2s;
+        }
+        .login-card input:focus { border-color: #0ea5e9; }
+        .login-card button {
+            background: #0ea5e9; color: white; border: none; padding: 15px;
+            font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer;
+            width: 100%; transition: background 0.2s; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);
+        }
+        .login-card button:hover { background: #0284c7; transform: translateY(-2px); }
+        #login-error { color: #ef4444; font-weight: bold; display: none; margin-top: 15px; }
+
+        /* 圖書館主體容器 (預設先隱藏) */
         .app-container {
             background: #ffffff; width: 100%; max-width: 800px;
             border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 50, 100, 0.1);
-            overflow: hidden; padding: 30px;
+            overflow: hidden; padding: 30px; display: none;
         }
 
         /* 頂部導覽列 */
@@ -51,26 +78,22 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin: 0 auto;
         }
         
-        /* ⚠️ 修正重點：加上 width: 100% 確保容器被撐開 */
         .player-area { 
             flex-grow: 1; text-align: center; display: flex; 
             flex-direction: column; align-items: center; width: 100%; 
         }
         
-        /* 避免長單字超出邊界 */
         .book-title { 
             color: #1e293b; font-size: 24px; font-weight: 700; 
             margin: 0 0 5px 0; word-break: break-all; 
         }
         .track-status { color: #64748b; font-size: 14px; margin-bottom: 10px; }
         
-        /* ⚠️ 修正重點：加上 min-width 確保手機版播放條不消失 */
         audio { 
             width: 100%; max-width: 400px; min-width: 250px; 
             height: 50px; outline: none; margin-bottom: 10px; 
         }
 
-        /* 模式切換按鈕樣式 */
         .mode-btn {
             background-color: #f8fafc; border: 2px solid #cbd5e1; color: #475569;
             padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;
@@ -95,12 +118,23 @@
         @media (max-width: 500px) {
             .header-section { flex-direction: column; text-align: center; }
             .cover-img { width: 120px; margin-bottom: 15px; }
-            audio { max-width: 100%; min-width: 100%; } /* 手機版強制拉滿寬度 */
+            audio { max-width: 100%; min-width: 100%; } 
         }
     </style>
 </head>
 <body>
 
+    <!-- 🔒 密碼登入畫面 -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>📚 圖書館專屬通道</h2>
+            <input type="password" id="pin-input" placeholder="請輸入密碼 (Enter Code)" inputmode="numeric">
+            <button onclick="checkPin()">進入圖書館</button>
+            <div id="login-error">密碼錯誤，請再試一次！</div>
+        </div>
+    </div>
+
+    <!-- 📚 圖書館主體 -->
     <div class="app-container" id="app">
         <div id="loading-msg">⏳ 正在載入圖書館資料...</div>
         
@@ -109,13 +143,11 @@
             <a href="?" class="back-btn">返回書櫃主頁</a>
         </div>
 
-        <!-- 書櫃主頁 -->
         <div id="library-view" style="display: none;">
             <h1 class="library-title">📚 皓孩子圖書館</h1>
             <div id="library-grid" class="library-grid"></div>
         </div>
 
-        <!-- 播放器介面 -->
         <div id="player-view" style="display: none;">
             <div class="top-nav">
                 <a href="?" class="back-btn">⬅ 返回書櫃</a>
@@ -127,12 +159,10 @@
                     <h1 id="ui-book-title" class="book-title">書本名稱</h1>
                     <div id="ui-track-status" class="track-status">請選擇下方單元開始播放</div>
                     
-                    <!-- 模式切換按鈕 -->
                     <button id="mode-toggle-btn" class="mode-btn">⏭️ 目前模式：順序播放</button>
                     
-                    <!-- 移除了原本的 loop 屬性，改由程式控制 -->
                     <audio id="main-player" controls controlsList="nodownload">
-                        <source id="audio-source" src="" type="audio/mpeg">
+                        <source id="audio-source" src="">
                     </audio>
                 </div>
             </div>
@@ -146,12 +176,14 @@
 
     <script>
         // ==========================================
-        // 🔗 你的專屬 Google 試算表 CSV 網址
+        // 🔒 設定你的專屬密碼
         // ==========================================
-        const booksCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=0&single=true&output=csv';
-        const unitsCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=138797041&single=true&output=csv';
+        const SECRET_PIN = "4683131";
         // ==========================================
 
+        const booksCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=0&single=true&output=csv';
+        const unitsCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=138797041&single=true&output=csv';
+        
         const urlParams = new URLSearchParams(window.location.search);
         const urlBookId = urlParams.get('book');
         
@@ -159,54 +191,87 @@
         const loadingMsg = document.getElementById('loading-msg');
         const libraryView = document.getElementById('library-view');
         const playerView = document.getElementById('player-view');
-
-        // 播放控制用的全域變數
+        
         let currentTracksList = [];
         let currentPlayingIndex = 0;
-        let isSingleLoop = false; // 預設為順序播放
+        let isSingleLoop = false; 
 
-        // 取得當下時間，當作防快取的隨機碼
-        const noCache = '&t=' + new Date().getTime();
-
-        // 在網址後面加上 noCache，強迫瀏覽器每次都抓最新資料
-        Promise.all([
-            new Promise(resolve => Papa.parse(booksCSVUrl + noCache, { download: true, header: true, complete: resolve })),
-            new Promise(resolve => Papa.parse(unitsCSVUrl + noCache, { download: true, header: true, complete: resolve }))
-        ]).then(results => {
-            const booksData = results[0].data;
-            const unitsData = results[1].data;
-            const bookDatabase = {};
-
-            booksData.forEach(row => {
-                if (row.book_ID && row.Status === 'Active') {
-                    bookDatabase[row.book_ID] = {
-                        title: row.title,
-                        cover: row.cover_image,
-                        tracks: [] 
-                    };
-                }
-            });
-
-            unitsData.forEach(row => {
-                if (row.book_ID && bookDatabase[row.book_ID] && row.audio_URL) {
-                    let finalAudioPath = row.audio_URL;
-                    if (!finalAudioPath.endsWith('.mp3')) finalAudioPath += '.mp3';
-                    
-                    bookDatabase[row.book_ID].tracks.push({
-                        name: row.unit_name,
-                        file: finalAudioPath
-                    });
-                }
-            });
-
-            loadingMsg.style.display = 'none';
-
-            if (urlBookId) {
-                renderPlayer(bookDatabase, urlBookId);
-            } else {
-                renderLibrary(bookDatabase);
+        // 🔐 檢查登入狀態與密碼驗證功能
+        window.onload = function() {
+            // 檢查瀏覽器有沒有記住解鎖狀態
+            if (localStorage.getItem('hao_library_unlocked') === 'true') {
+                unlockLibrary();
             }
-        });
+            
+            // 讓使用者按 Enter 鍵也能送出密碼
+            document.getElementById('pin-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') checkPin();
+            });
+        };
+
+        function checkPin() {
+            const input = document.getElementById('pin-input').value;
+            if (input === SECRET_PIN) {
+                // 密碼正確，記錄到瀏覽器
+                localStorage.setItem('hao_library_unlocked', 'true');
+                unlockLibrary();
+            } else {
+                // 密碼錯誤
+                document.getElementById('login-error').style.display = 'block';
+                document.getElementById('pin-input').value = ''; // 清空輸入框
+            }
+        }
+
+        // 解鎖圖書館並開始載入資料
+        function unlockLibrary() {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            initLibraryApp(); // 啟動主程式
+        }
+
+        // 📚 原本的圖書館主程式 (包裝成一個功能)
+        function initLibraryApp() {
+            const noCache = '&t=' + new Date().getTime();
+
+            Promise.all([
+                new Promise(resolve => Papa.parse(booksCSVUrl + noCache, { download: true, header: true, complete: resolve })),
+                new Promise(resolve => Papa.parse(unitsCSVUrl + noCache, { download: true, header: true, complete: resolve }))
+            ]).then(results => {
+                const booksData = results[0].data;
+                const unitsData = results[1].data;
+                const bookDatabase = {};
+
+                booksData.forEach(row => {
+                    if (row.book_ID && row.Status === 'Active') {
+                        bookDatabase[row.book_ID] = {
+                            title: row.title,
+                            cover: row.cover_image,
+                            tracks: [] 
+                        };
+                    }
+                });
+
+                unitsData.forEach(row => {
+                    if (row.book_ID && bookDatabase[row.book_ID] && row.audio_URL) {
+                        let finalAudioPath = row.audio_URL;
+                        if (!finalAudioPath.includes('.')) finalAudioPath += '.mp3';
+                        
+                        bookDatabase[row.book_ID].tracks.push({
+                            name: row.unit_name,
+                            file: finalAudioPath
+                        });
+                    }
+                });
+
+                loadingMsg.style.display = 'none';
+
+                if (urlBookId) {
+                    renderPlayer(bookDatabase, urlBookId);
+                } else {
+                    renderLibrary(bookDatabase);
+                }
+            });
+        }
 
         // 渲染書櫃主頁
         function renderLibrary(bookDatabase) {
@@ -231,20 +296,18 @@
                 const bookData = bookDatabase[bookId];
                 playerView.style.display = 'block';
                 
-                // 把這本書的音檔清單存起來，方便後面找「下一首」
                 currentTracksList = bookData.tracks;
 
                 document.getElementById('ui-cover').src = bookData.cover;
                 document.getElementById('ui-book-title').innerText = bookData.title;
 
                 const grid = document.getElementById('ui-button-grid');
-                grid.innerHTML = ''; // 清空按鈕
+                grid.innerHTML = ''; 
 
                 bookData.tracks.forEach((track, index) => {
                     const btn = document.createElement('button');
                     btn.className = 'track-btn';
                     btn.innerText = track.name;
-                    // 改為傳遞音檔的「編號 (index)」給播放功能
                     btn.onclick = function() {
                         playTrackByIndex(index);
                     };
@@ -269,7 +332,6 @@
             player.load();
             player.play();
 
-            // 讓對應的按鈕亮起來
             const buttons = document.querySelectorAll('.track-btn');
             buttons.forEach((btn, i) => {
                 if (i === index) btn.classList.add('active');
@@ -282,27 +344,25 @@
         const player = document.getElementById('main-player');
 
         modeBtn.onclick = function() {
-            isSingleLoop = !isSingleLoop; // 反轉模式狀態
+            isSingleLoop = !isSingleLoop; 
             if (isSingleLoop) {
                 modeBtn.innerText = '🔁 目前模式：單曲循環';
                 modeBtn.classList.add('loop-active');
-                player.loop = true; // 啟動原生的循環播放
+                player.loop = true; 
             } else {
                 modeBtn.innerText = '⏭️ 目前模式：順序播放';
                 modeBtn.classList.remove('loop-active');
-                player.loop = false; // 關閉原生循環，交給下方 ended 事件處理
+                player.loop = false; 
             }
         };
 
-        // 🎵 自動播放下一首功能 (監聽音檔結束事件)
+        // 🎵 自動播放下一首功能
         player.addEventListener('ended', function() {
-            if (!isSingleLoop) { // 只有在「順序播放」模式下才執行
+            if (!isSingleLoop) { 
                 let nextIndex = currentPlayingIndex + 1;
-                // 如果還有下一首，就播放下一首
                 if (nextIndex < currentTracksList.length) {
                     playTrackByIndex(nextIndex);
                 } else {
-                    // 如果已經是最後一首，自動回到第一首重新開始
                     playTrackByIndex(0);
                 }
             }
