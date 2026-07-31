@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>songs</title>
+    <style>
+        /* 基礎美化與字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap');
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Nunito', 'Segoe UI', Tahoma, sans-serif; 
+            background: linear-gradient(135deg, #f0f9ff 0%, #cbebff 100%); 
+            margin: 0; padding: 20px; min-height: 100vh;
+            display: flex; justify-content: center; align-items: center;
+        }
+        
+        .app-container {
+            background: #ffffff; width: 100%; max-width: 800px;
+            border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 50, 100, 0.1);
+            overflow: hidden; padding: 30px;
+        }
+
+        .header-section {
+            display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+            border-bottom: 2px dashed #e2e8f0; padding-bottom: 20px; margin-bottom: 20px;
+        }
+        .cover-img {
+            width: 150px; height: auto; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin: 0 auto;
+        }
+        .player-area { flex-grow: 1; text-align: center; }
+        .book-title { color: #1e293b; font-size: 24px; font-weight: 700; margin: 0 0 5px 0; }
+        .track-status { color: #64748b; font-size: 14px; margin-bottom: 15px; }
+        audio { width: 100%; height: 50px; outline: none; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+        button { 
+            padding: 12px 8px; border: none; background-color: #f1f5f9; color: #475569; 
+            border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: bold;
+            transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        button:hover { background-color: #e2e8f0; transform: translateY(-2px); }
+        button.active { background-color: #0ea5e9; color: white; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4); }
+
+        #error-msg, #loading-msg { text-align: center; font-size: 18px; font-weight: bold; }
+        #error-msg { color: #ef4444; display: none; }
+        #loading-msg { color: #0ea5e9; }
+
+        @media (max-width: 500px) {
+            .header-section { flex-direction: column; text-align: center; }
+            .cover-img { width: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="app">
+        <!-- 載入與錯誤訊息 -->
+        <div id="loading-msg">⏳ 正在從資料庫載入教材...</div>
+        <div id="error-msg">找不到這本書的資料，請確認網址參數是否正確。</div>
+
+        <div id="main-content" style="display: none;">
+            <div class="header-section">
+                <img id="ui-cover" src="" alt="書本封面" class="cover-img">
+                <div class="player-area">
+                    <h1 id="ui-book-title" class="book-title">書本名稱</h1>
+                    <div id="ui-track-status" class="track-status">請選擇下方單元開始播放</div>
+                    
+                    <audio id="main-player" controls controlsList="nodownload" loop>
+                        <source id="audio-source" src="" type="audio/mpeg">
+                    </audio>
+                </div>
+            </div>
+
+            <div id="ui-button-grid" class="grid"></div>
+        </div>
+    </div>
+
+    <!-- 引入 CSV 讀取工具 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 🔗 你的專屬 Google 試算表 CSV 網址 (已更新)
+        // ==========================================
+        const booksCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR6JuHCvu_N22dV1_-n7HR2rVVzuvxzKwBW6_Ampt44S9TZ1ZlqLyiGrv8fTookjNVtxyv5MibGOFW-/pub?gid=0&single=true&output=csv';
+        const unitsCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR6JuHCvu_N22dV1_-n7HR2rVVzuvxzKwBW6_Ampt44S9TZ1ZlqLyiGrv8fTookjNVtxyv5MibGOFW-/pub?gid=451586796&single=true&output=csv';
+        // ==========================================
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlBookId = urlParams.get('book');
+        
+        const errorMsg = document.getElementById('error-msg');
+        const loadingMsg = document.getElementById('loading-msg');
+        const mainContent = document.getElementById('main-content');
+
+        // 同時下載 Books 和 Units 兩份資料表
+        Promise.all([
+            new Promise(resolve => Papa.parse(booksCSVUrl, { download: true, header: true, complete: resolve })),
+            new Promise(resolve => Papa.parse(unitsCSVUrl, { download: true, header: true, complete: resolve }))
+        ]).then(results => {
+            const booksData = results[0].data;
+            const unitsData = results[1].data;
+            const bookDatabase = {};
+
+            // 1. 先處理 Books 資料
+            booksData.forEach(row => {
+                if (row.book_ID && row.Status === 'Active') {
+                    bookDatabase[row.book_ID] = {
+                        title: row.title,
+                        cover: row.cover_image,
+                        tracks: [] 
+                    };
+                }
+            });
+
+            // 2. 把 Units 資料對應塞進 Books 裡面
+            unitsData.forEach(row => {
+                if (row.book_ID && bookDatabase[row.book_ID] && row.audio_URL) {
+                    let finalAudioPath = row.audio_URL;
+                    if (!finalAudioPath.endsWith('.mp3')) {
+                        finalAudioPath += '.mp3';
+                    }
+                    bookDatabase[row.book_ID].tracks.push({
+                        name: row.unit_name,
+                        file: finalAudioPath
+                    });
+                }
+            });
+
+            loadingMsg.style.display = 'none';
+            renderPlayer(bookDatabase);
+        });
+
+        // 渲染畫面的函數
+        function renderPlayer(bookDatabase) {
+            if (urlBookId && bookDatabase[urlBookId]) {
+                const bookData = bookDatabase[urlBookId];
+                mainContent.style.display = 'block';
+
+                document.getElementById('ui-cover').src = bookData.cover;
+                document.getElementById('ui-book-title').innerText = bookData.title;
+
+                const grid = document.getElementById('ui-button-grid');
+                bookData.tracks.forEach(track => {
+                    const btn = document.createElement('button');
+                    btn.innerText = track.name;
+                    btn.onclick = function() {
+                        playTrack(track.file, track.name, this);
+                    };
+                    grid.appendChild(btn);
+                });
+            } else {
+                errorMsg.style.display = 'block';
+            }
+        }
+
+        // 播放控制函數
+        function playTrack(audioSrc, trackName, btnElement) {
+            const player = document.getElementById('main-player');
+            const source = document.getElementById('audio-source');
+            const status = document.getElementById('ui-track-status');
+
+            status.innerText = '🔊 正在播放: ' + trackName;
+            source.src = audioSrc;
+            
+            player.load();
+            player.play();
+
+            document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+    </script>
+</body>
+</html>
