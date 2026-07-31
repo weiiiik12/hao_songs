@@ -196,13 +196,8 @@
         let currentPlayingIndex = 0;
         let isSingleLoop = false; 
 
-        // 🔐 檢查登入狀態與密碼驗證功能
+        // 🔐 密碼驗證功能（每次都要重新輸入）
         window.onload = function() {
-            // 檢查瀏覽器有沒有記住解鎖狀態
-            if (localStorage.getItem('hao_library_unlocked') === 'true') {
-                unlockLibrary();
-            }
-            
             // 讓使用者按 Enter 鍵也能送出密碼
             document.getElementById('pin-input').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') checkPin();
@@ -212,16 +207,14 @@
         function checkPin() {
             const input = document.getElementById('pin-input').value;
             if (input === SECRET_PIN) {
-                // 密碼正確，記錄到瀏覽器
-                localStorage.setItem('hao_library_unlocked', 'true');
-                unlockLibrary();
+                unlockLibrary(); // 密碼正確，直接解鎖（不寫入瀏覽器記憶）
             } else {
                 // 密碼錯誤
                 document.getElementById('login-error').style.display = 'block';
                 document.getElementById('pin-input').value = ''; // 清空輸入框
             }
         }
-
+        
         // 解鎖圖書館並開始載入資料
         function unlockLibrary() {
             document.getElementById('login-overlay').style.display = 'none';
