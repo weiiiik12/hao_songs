@@ -196,11 +196,21 @@
         let currentPlayingIndex = 0;
         let isSingleLoop = false; 
 
-        // 🔐 檢查登入狀態與密碼驗證功能
+        // 🔐 檢查登入狀態與密碼驗證功能 (一天刷新一次版)
         window.onload = function() {
-            // 檢查瀏覽器有沒有記住解鎖狀態
-            if (localStorage.getItem('hao_library_unlocked') === 'true') {
-                unlockLibrary();
+            // 檢查瀏覽器有沒有記住解鎖時間
+            const savedTime = localStorage.getItem('hao_library_unlocked_time');
+            if (savedTime) {
+                const now = new Date().getTime();
+                const oneDay = 24 * 60 * 60 * 1000; // 一天的時間 (24小時換算成毫秒)
+                
+                // 如果現在時間減去登入時間，還小於一天，就保持解鎖
+                if (now - savedTime < oneDay) {
+                    unlockLibrary();
+                } else {
+                    // 如果超過一天，就把過期的紀錄刪掉，等著重新輸入
+                    localStorage.removeItem('hao_library_unlocked_time');
+                }
             }
             
             // 讓使用者按 Enter 鍵也能送出密碼
@@ -212,8 +222,8 @@
         function checkPin() {
             const input = document.getElementById('pin-input').value;
             if (input === SECRET_PIN) {
-                // 密碼正確，記錄到瀏覽器
-                localStorage.setItem('hao_library_unlocked', 'true');
+                // 密碼正確，把「當下登入的時間」記錄到瀏覽器
+                localStorage.setItem('hao_library_unlocked_time', new Date().getTime());
                 unlockLibrary();
             } else {
                 // 密碼錯誤
