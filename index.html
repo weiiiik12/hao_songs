@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>songs</title>
+    <title>聽力練習圖書館</title>
     <style>
         /* 基礎美化與字體 */
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap');
@@ -21,6 +21,29 @@
             overflow: hidden; padding: 30px;
         }
 
+        /* 頂部導覽列 (新增返回按鈕) */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .back-btn { 
+            background: #f1f5f9; border: none; padding: 8px 15px; border-radius: 8px; 
+            color: #475569; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block;
+        }
+        .back-btn:hover { background: #e2e8f0; }
+
+        /* 書櫃主頁專用樣式 */
+        .library-title { text-align: center; color: #1e293b; margin-bottom: 25px; }
+        .library-grid { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; 
+        }
+        .book-card { 
+            background: #f8fafc; border-radius: 12px; padding: 15px; text-align: center;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .book-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .book-card img { width: 100%; max-width: 120px; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 10px; }
+        .book-card h3 { font-size: 16px; margin: 0; color: #334155; }
+
+        /* 播放器介面樣式 */
         .header-section {
             display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
             border-bottom: 2px dashed #e2e8f0; padding-bottom: 20px; margin-bottom: 20px;
@@ -35,16 +58,16 @@
         audio { width: 100%; height: 50px; outline: none; }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
-        button { 
+        button.track-btn { 
             padding: 12px 8px; border: none; background-color: #f1f5f9; color: #475569; 
             border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: bold;
             transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        button:hover { background-color: #e2e8f0; transform: translateY(-2px); }
-        button.active { background-color: #0ea5e9; color: white; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4); }
+        button.track-btn:hover { background-color: #e2e8f0; transform: translateY(-2px); }
+        button.track-btn.active { background-color: #0ea5e9; color: white; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4); }
 
         #error-msg, #loading-msg { text-align: center; font-size: 18px; font-weight: bold; }
-        #error-msg { color: #ef4444; display: none; }
+        #error-msg { color: #ef4444; display: none; margin-top: 20px; }
         #loading-msg { color: #0ea5e9; }
 
         @media (max-width: 500px) {
@@ -56,11 +79,30 @@
 <body>
 
     <div class="app-container" id="app">
-        <!-- 載入與錯誤訊息 -->
-        <div id="loading-msg">⏳ 正在從資料庫載入教材...</div>
-        <div id="error-msg">找不到這本書的資料，請確認網址參數是否正確。</div>
+        <!-- 載入訊息 -->
+        <div id="loading-msg">⏳ 正在載入圖書館資料...</div>
+        
+        <!-- 錯誤訊息 (附帶返回首頁按鈕) -->
+        <div id="error-msg">
+            找不到這本書的資料，請確認網址參數是否正確。<br><br>
+            <a href="?" class="back-btn">返回書櫃主頁</a>
+        </div>
 
-        <div id="main-content" style="display: none;">
+        <!-- 畫面一：書櫃主頁 (預設隱藏) -->
+        <div id="library-view" style="display: none;">
+            <h1 class="library-title">📚 聽力練習圖書館</h1>
+            <div id="library-grid" class="library-grid">
+                <!-- 書本卡片會由 JavaScript 自動生成在這裡 -->
+            </div>
+        </div>
+
+        <!-- 畫面二：播放器介面 (預設隱藏) -->
+        <div id="player-view" style="display: none;">
+            <div class="top-nav">
+                <!-- 點擊這個按鈕會清空參數，回到主頁 -->
+                <a href="?" class="back-btn">⬅ 返回書櫃</a>
+            </div>
+            
             <div class="header-section">
                 <img id="ui-cover" src="" alt="書本封面" class="cover-img">
                 <div class="player-area">
@@ -82,9 +124,8 @@
 
     <script>
         // ==========================================
-        // 🔗 你的專屬 Google 試算表 CSV 網址 (已更新)
+        // 🔗 你的專屬 Google 試算表 CSV 網址
         // ==========================================
-        
         const booksCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=0&single=true&output=csv';
         const unitsCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=138797041&single=true&output=csv';
         // ==========================================
@@ -94,9 +135,10 @@
         
         const errorMsg = document.getElementById('error-msg');
         const loadingMsg = document.getElementById('loading-msg');
-        const mainContent = document.getElementById('main-content');
+        const libraryView = document.getElementById('library-view');
+        const playerView = document.getElementById('player-view');
 
-        // 同時下載 Books 和 Units 兩份資料表
+        // 下載資料
         Promise.all([
             new Promise(resolve => Papa.parse(booksCSVUrl, { download: true, header: true, complete: resolve })),
             new Promise(resolve => Papa.parse(unitsCSVUrl, { download: true, header: true, complete: resolve }))
@@ -105,7 +147,7 @@
             const unitsData = results[1].data;
             const bookDatabase = {};
 
-            // 1. 先處理 Books 資料
+            // 處理 Books 資料
             booksData.forEach(row => {
                 if (row.book_ID && row.Status === 'Active') {
                     bookDatabase[row.book_ID] = {
@@ -116,7 +158,7 @@
                 }
             });
 
-            // 2. 把 Units 資料對應塞進 Books 裡面
+            // 處理 Units 資料
             unitsData.forEach(row => {
                 if (row.book_ID && bookDatabase[row.book_ID] && row.audio_URL) {
                     let finalAudioPath = row.audio_URL;
@@ -131,14 +173,39 @@
             });
 
             loadingMsg.style.display = 'none';
-            renderPlayer(bookDatabase);
+
+            // 判斷邏輯：有參數就顯示播放器，沒參數就顯示書櫃
+            if (urlBookId) {
+                renderPlayer(bookDatabase, urlBookId);
+            } else {
+                renderLibrary(bookDatabase);
+            }
         });
 
-        // 渲染畫面的函數
-        function renderPlayer(bookDatabase) {
-            if (urlBookId && bookDatabase[urlBookId]) {
-                const bookData = bookDatabase[urlBookId];
-                mainContent.style.display = 'block';
+        // 渲染「書櫃主頁」
+        function renderLibrary(bookDatabase) {
+            libraryView.style.display = 'block';
+            const libraryGrid = document.getElementById('library-grid');
+            
+            // 迴圈跑遍所有書籍，建立卡片
+            for (const [id, bookData] of Object.entries(bookDatabase)) {
+                const card = document.createElement('a');
+                card.href = `?book=${id}`; // 點擊時連到該書的專屬網址
+                card.className = 'book-card';
+                
+                card.innerHTML = `
+                    <img src="${bookData.cover}" alt="${bookData.title}">
+                    <h3>${bookData.title}</h3>
+                `;
+                libraryGrid.appendChild(card);
+            }
+        }
+
+        // 渲染「播放器介面」
+        function renderPlayer(bookDatabase, bookId) {
+            if (bookDatabase[bookId]) {
+                const bookData = bookDatabase[bookId];
+                playerView.style.display = 'block';
 
                 document.getElementById('ui-cover').src = bookData.cover;
                 document.getElementById('ui-book-title').innerText = bookData.title;
@@ -146,6 +213,7 @@
                 const grid = document.getElementById('ui-button-grid');
                 bookData.tracks.forEach(track => {
                     const btn = document.createElement('button');
+                    btn.className = 'track-btn';
                     btn.innerText = track.name;
                     btn.onclick = function() {
                         playTrack(track.file, track.name, this);
@@ -169,7 +237,7 @@
             player.load();
             player.play();
 
-            document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.track-btn').forEach(btn => btn.classList.remove('active'));
             btnElement.classList.add('active');
         }
     </script>
