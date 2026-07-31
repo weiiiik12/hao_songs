@@ -165,9 +165,13 @@
         let currentPlayingIndex = 0;
         let isSingleLoop = false; // 預設為順序播放
 
+        // 取得當下時間，當作防快取的隨機碼
+        const noCache = '&t=' + new Date().getTime();
+
+        // 在網址後面加上 noCache，強迫瀏覽器每次都抓最新資料
         Promise.all([
-            new Promise(resolve => Papa.parse(booksCSVUrl, { download: true, header: true, complete: resolve })),
-            new Promise(resolve => Papa.parse(unitsCSVUrl, { download: true, header: true, complete: resolve }))
+            new Promise(resolve => Papa.parse(booksCSVUrl + noCache, { download: true, header: true, complete: resolve })),
+            new Promise(resolve => Papa.parse(unitsCSVUrl + noCache, { download: true, header: true, complete: resolve }))
         ]).then(results => {
             const booksData = results[0].data;
             const unitsData = results[1].data;
