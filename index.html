@@ -220,26 +220,43 @@
         };
 
         // ====== 這是修正後的全新連線驗證功能 ======
-        function checkPin() {
+        // ====== 升級版：帶有 IP 與裝置追蹤的連線驗證功能 ======
+        async function checkPin() {
             const input = document.getElementById('pin-input').value;
             const btn = document.getElementById('login-btn');
             const errorDiv = document.getElementById('login-error');
 
             if (!input) {
-                errorDiv.innerText = "請輸入密碼！";
+                errorDiv.innerText = "請輸入access code！";
                 errorDiv.style.display = 'block';
                 return;
             }
 
-            // 按下按鈕後，先改變文字並禁用，避免重複點擊
             btn.innerText = "驗證中...";
             btn.disabled = true;
             errorDiv.style.display = 'none';
 
+            // 偷偷抓取使用者的 IP (使用免費的 ipify 服務)
+            let currentIP = "無法取得";
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                currentIP = ipData.ip;
+            } catch (e) {
+                console.log("IP 抓取失敗，但繼續執行登入");
+            }
+
+            // 抓取使用者的裝置與瀏覽器資訊
+            const currentDevice = navigator.userAgent;
+
             fetch(LOGIN_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ code: input })
+                body: JSON.stringify({ 
+                    code: input,
+                    ip: currentIP,       // 打包 IP 
+                    device: currentDevice // 打包裝置資訊
+                })
             })
             .then(res => res.json())
             .then(data => {
@@ -247,14 +264,12 @@
                 btn.disabled = false;
 
                 if (data.success) {
-                    // 密碼正確，把「當下登入的時間」記錄到瀏覽器
                     localStorage.setItem('hao_library_unlocked_time', new Date().getTime());
                     unlockLibrary();
                 } else {
-                    // 密碼錯誤
                     errorDiv.innerText = data.message || "密碼錯誤，請再試一次！";
                     errorDiv.style.display = 'block';
-                    document.getElementById('pin-input').value = ''; // 清空輸入框
+                    document.getElementById('pin-input').value = ''; 
                 }
             })
             .catch(err => {
