@@ -220,14 +220,14 @@
         };
 
         // ====== 這是修正後的全新連線驗證功能 ======
-        // ====== 升級版：帶有 IP 與裝置追蹤的連線驗證功能 ======
+        // ====== 終極版：帶有 IP、裝置與地理位置追蹤的連線驗證功能 ======
         async function checkPin() {
             const input = document.getElementById('pin-input').value;
             const btn = document.getElementById('login-btn');
             const errorDiv = document.getElementById('login-error');
 
             if (!input) {
-                errorDiv.innerText = "請輸入access code！";
+                errorDiv.innerText = "請輸入密碼！";
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -236,17 +236,22 @@
             btn.disabled = true;
             errorDiv.style.display = 'none';
 
-            // 偷偷抓取使用者的 IP (使用免費的 ipify 服務)
+            // 偷偷抓取使用者的 IP 與大約地理位置
             let currentIP = "無法取得";
+            let currentLocation = "未知位置";
             try {
-                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                // 改用 ipapi 服務，它可以一併回傳國家與城市
+                const ipResponse = await fetch('https://ipapi.co/json/');
                 const ipData = await ipResponse.json();
-                currentIP = ipData.ip;
+                if (ipData.ip) {
+                    currentIP = ipData.ip;
+                    // 將城市與國家組合起來，例如會呈現 "Taoyuan City, Taiwan"
+                    currentLocation = (ipData.city || "未知城市") + ", " + (ipData.country_name || "未知國家");
+                }
             } catch (e) {
-                console.log("IP 抓取失敗，但繼續執行登入");
+                console.log("IP/位置抓取失敗，但繼續執行登入");
             }
 
-            // 抓取使用者的裝置與瀏覽器資訊
             const currentDevice = navigator.userAgent;
 
             fetch(LOGIN_API_URL, {
@@ -254,8 +259,9 @@
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ 
                     code: input,
-                    ip: currentIP,       // 打包 IP 
-                    device: currentDevice // 打包裝置資訊
+                    ip: currentIP,
+                    device: currentDevice,
+                    location: currentLocation // 把位置資訊一起打包送給後台
                 })
             })
             .then(res => res.json())
