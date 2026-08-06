@@ -129,7 +129,7 @@
         <div class="login-card">
             <h2>📚 圖書館專屬通道</h2>
             <input type="password" id="pin-input" placeholder="請輸入密碼 (Enter Code)" inputmode="numeric">
-            <button onclick="checkPin()">進入圖書館</button>
+            <button id="login-btn" onclick="checkPin()">進入圖書館</button>
             <div id="login-error">密碼錯誤，請再試一次！</div>
         </div>
     </div>
@@ -176,11 +176,11 @@
 
     <script>
         // ==========================================
-        // 🔒 設定你的專屬密碼
+        // 🔒 雲端密碼驗證設定
         // ==========================================
-        const SECRET_PIN = "4683131";
-        // ==========================================
-
+        // ⚠️ 請將下方的網址換成你部署出來的「家長版」Apps Script 網頁應用程式網址
+        const LOGIN_API_URL = "https://script.google.com/macros/s/AKfycbyxo4h4nuaXtjBXnThUJ-FP1S3WqHT1dpInqeyzB3sdxIUAXADhXWVRGgmXUdr4lB7Z0Q/exec";
+        
         const booksCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=0&single=true&output=csv';
         const unitsCSVUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyE9f98qOVmnKUWhTKV9KgEprJHkGB3pTZnqm61C6Quuy6oVYyBO1QgUP7NoLa8E_f6IdAOfoalVWp/pub?gid=138797041&single=true&output=csv';
         
@@ -219,17 +219,50 @@
             });
         };
 
+        // ====== 這是修正後的全新連線驗證功能 ======
         function checkPin() {
             const input = document.getElementById('pin-input').value;
-            if (input === SECRET_PIN) {
-                // 密碼正確，把「當下登入的時間」記錄到瀏覽器
-                localStorage.setItem('hao_library_unlocked_time', new Date().getTime());
-                unlockLibrary();
-            } else {
-                // 密碼錯誤
-                document.getElementById('login-error').style.display = 'block';
-                document.getElementById('pin-input').value = ''; // 清空輸入框
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+
+            if (!input) {
+                errorDiv.innerText = "請輸入密碼！";
+                errorDiv.style.display = 'block';
+                return;
             }
+
+            // 按下按鈕後，先改變文字並禁用，避免重複點擊
+            btn.innerText = "驗證中...";
+            btn.disabled = true;
+            errorDiv.style.display = 'none';
+
+            fetch(LOGIN_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ code: input })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.innerText = "進入圖書館";
+                btn.disabled = false;
+
+                if (data.success) {
+                    // 密碼正確，把「當下登入的時間」記錄到瀏覽器
+                    localStorage.setItem('hao_library_unlocked_time', new Date().getTime());
+                    unlockLibrary();
+                } else {
+                    // 密碼錯誤
+                    errorDiv.innerText = data.message || "密碼錯誤，請再試一次！";
+                    errorDiv.style.display = 'block';
+                    document.getElementById('pin-input').value = ''; // 清空輸入框
+                }
+            })
+            .catch(err => {
+                btn.innerText = "進入圖書館";
+                btn.disabled = false;
+                errorDiv.innerText = "網路連線失敗，請檢查網路後再試。";
+                errorDiv.style.display = 'block';
+            });
         }
         
         // 解鎖圖書館並開始載入資料
